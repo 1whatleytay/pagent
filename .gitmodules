@@ -1,0 +1,6 @@
+[submodule "external/fmt"]
+	path = external/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "external/langutil"]
+	path = external/langutil
+	url = https://github.com/1whatleytay/langutil.git
