@@ -31,11 +31,9 @@ Typename TypeNode::evaluate() {
 TypeNode::TypeNode(Parser &parser, Node *parent) : Node(parent, Type::Type) {
     std::string typeWord = parser.next();
 
-    if (typeWord == "type")
-        type = Type::Type;
-    else if (typeWord == "page")
-        type = Type::Page;
-    else
+    if (typeWord == "page")
+        isPage = true;
+    else if (typeWord != "type")
         throw ParseError(parser, "Internal error, expected type.");
 
     name = parser.next();
@@ -71,12 +69,12 @@ TypeNode::TypeNode(Parser &parser, Node *parent) : Node(parent, Type::Type) {
         } else if (attributes["init"] && (next == "(" || next == "{")) { // constructor is special
             children.push_back(std::make_shared<MethodNode>(parser, this, true, attributes["implicit"]));
         } else if (next == "route") {
-            if (type != Type::Page)
+            if (!isPage)
                 throw ParseError(parser, "Route element can only be used on page components.");
 
             children.push_back(std::make_shared<RouteNode>(parser, this));
         } else if (next == "view" || next == "scene") {
-            if (type != Type::Page)
+            if (!isPage)
                 throw ParseError(parser, "Element with type {} can only be used on page components.", next);
 
             // expression nodes can be assumed to be UI view/scene nodes

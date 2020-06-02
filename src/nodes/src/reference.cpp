@@ -6,7 +6,7 @@
 #include <nodes/variable.h>
 #include <nodes/expression.h>
 
-std::vector<Node *> ReferenceNode::dereference(Node *reference) {
+ReferenceNode *ReferenceNode::next() {
     size_t nextIndex = 0;
     // this is ridiculous
     if (hasCall)
@@ -14,8 +14,47 @@ std::vector<Node *> ReferenceNode::dereference(Node *reference) {
     if (hasContent)
         nextIndex += 1;
 
-    bool extends = children.size() > nextIndex;
+    if (children.size() > nextIndex)
+        return children[nextIndex]->as<ReferenceNode>();
 
+    return nullptr;
+}
+
+TypeNode *ReferenceNode::findType(Node *referenced) {
+    Typename extendType;
+
+    if (hasCall || hasContent) {
+        extendType = referenced->as<MethodNode>()->evaluateReturn();
+    } else {
+        if (referenced->type == Type::Method)
+            extendType = referenced->as<MethodNode>()->evaluate();
+        else
+            extendType = referenced->as<VariableNode>()->evaluate();
+    }
+
+    TypeNode *evalNode = referenced->searchScope([&extendType](Node *node) {
+        return node->type == Type::Type && Typename(node->as<TypeNode>()->name) == extendType;
+    })->as<TypeNode>();
+
+    if (!evalNode)
+        throw VerifyError("Could not find type with name {} to extend.", extendType.toString());
+
+    return evalNode;
+}
+
+std::vector<Node *> ReferenceNode::dereference(Node *reference) {
+    std::vector<Node *> result = dereferenceThis(reference);
+
+    if (next()) {
+        Node *evalNode = findType(selectFrom(result));
+
+        return next()->dereference(evalNode);
+    }
+
+    return result;
+}
+
+std::vector<Node *> ReferenceNode::dereferenceThis(Node *reference) {
     std::vector<Node *> result;
 
     std::function<bool(Node *)> checker = [this, &result](Node *node) {
@@ -50,29 +89,6 @@ std::vector<Node *> ReferenceNode::dereference(Node *reference) {
         });
     }
 
-    if (extends) {
-        Node *toExtend = selectFrom(result);
-        Typename extendType;
-
-        if (hasCall || hasContent) {
-            extendType = toExtend->as<MethodNode>()->evaluateReturn();
-        } else {
-            if (toExtend->type == Type::Method)
-                extendType = toExtend->as<MethodNode>()->evaluate();
-            else
-                extendType = toExtend->as<VariableNode>()->evaluate();
-        }
-
-        Node *evalNode = result[0]->searchScope([&extendType](Node *node) {
-            return node->type == Type::Type && Typename(node->as<TypeNode>()->name) == extendType;
-        });
-
-        if (!evalNode)
-            throw VerifyError("Could not find type with name {} to extend.", extendType.toString());
-
-        return children[nextIndex]->as<ReferenceNode>()->dereference(evalNode);
-    }
-
     return result;
 }
 
@@ -85,11 +101,7 @@ Node *ReferenceNode::selectFrom(const std::vector<Node *> &nodes) {
         throw VerifyError("Node dereferenced to nothing.");
 
     if (nodes[0]->type == Type::Method && (hasCall || hasContent)) {
-        std::vector<Node *> values(paramCount);
-
-        for (size_t a = 0; a < paramCount; a++) {
-            values[a] = children[a].get();
-        }
+        std::vector<Node *> values = getParameters();
 
         for (Node *node : nodes) {
             if (node->type != Type::Method)
@@ -110,6 +122,24 @@ Node *ReferenceNode::selectFrom(const std::vector<Node *> &nodes) {
 
         return nodes[0];
     }
+}
+
+Node *ReferenceNode::getContent() {
+    if (hasContent) {
+        return children[paramCount].get();
+    }
+
+    return nullptr;
+}
+
+std::vector<Node *> ReferenceNode::getParameters() {
+    std::vector<Node *> values(paramCount);
+
+    for (size_t a = 0; a < paramCount; a++) {
+        values[a] = children[a].get();
+    }
+
+    return values;
 }
 
 Typename ReferenceNode::evaluate(std::vector<Node *> visited) {
@@ -145,6 +175,11 @@ std::shared_ptr<Node> ReferenceNode::steal() {
     }
 
     return nullptr;
+}
+
+void ReferenceNode::verify() {
+    if (!select())
+        throw VerifyError("Could not evaluate reference {}.", content);
 }
 
 ReferenceNode::ReferenceNode(Parser &parser, Node *parent) : Node(parent, Type::Reference) {

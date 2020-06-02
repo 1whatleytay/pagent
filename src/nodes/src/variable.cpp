@@ -19,6 +19,19 @@ void VariableNode::verify() {
     Node::verify();
 }
 
+bool VariableNode::isField() {
+    return parent->type == Type::Type;
+}
+
+Node *VariableNode::defaultValue() {
+    size_t index = hasExplicitType ? 1 : 0;
+
+    if (children.size() > index)
+        return children[index].get();
+    else
+        return nullptr;
+}
+
 Typename VariableNode::evaluate(std::vector<Node *> visited) {
     if (std::find(visited.begin(), visited.end(), this) != visited.end())
         throw VerifyError("Circular evaluation detected, related to variable {}.", name);

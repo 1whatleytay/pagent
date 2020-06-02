@@ -32,6 +32,9 @@ public:
     bool init = false;
     bool implicit = false;
 
+    bool isMethod(); // oh dear the naming
+    Node *body();
+
     Parameters parameters();
 
     void verify() override;

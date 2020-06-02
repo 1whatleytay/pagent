@@ -69,7 +69,7 @@ std::string NodeList::getLine(Node *node) {
         }
         case Node::Type::Type: {
             TypeNode *e = node->as<TypeNode>();
-            return fmt::format("Type \"{}\"", e->name);
+            return fmt::format("Type \"{}\"{}", e->name, e->isPage ? " + page" : "");
         }
         case Node::Type::Variable: {
             VariableNode *e = node->as<VariableNode>();
@@ -104,10 +104,6 @@ std::string NodeList::getLine(Node *node) {
         case Node::Type::Statement: {
             StatementNode *e = node->as<StatementNode>();
             return fmt::format("Statement {}", getStatementOpName(e->op));
-        }
-        case Node::Type::Page: {
-            TypeNode *e = node->as<TypeNode>();
-            return fmt::format("Page \"{}\"", e->name);
         }
         case Node::Type::Route:
             return "Route";

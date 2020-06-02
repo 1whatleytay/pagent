@@ -20,6 +20,9 @@ public:
 
     void verify() override;
 
+    bool isField();
+    Node *defaultValue();
+
     Typename evaluate(std::vector<Node *> visited = { });
 
     VariableNode(std::string name, Node *parent);

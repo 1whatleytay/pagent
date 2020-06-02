@@ -4,8 +4,7 @@
 
 #include <fmt/printf.h>
 
-#include <vector>
-#include <fstream>
+#include <target/js/root.h>
 
 int main(int count, const char **args) {
     if (count != 2) {
@@ -13,22 +12,18 @@ int main(int count, const char **args) {
         return -1;
     }
 
-    std::ifstream stream(args[1], std::ios::ate);
-    std::vector<char> data(stream.tellg());
-    stream.seekg(0, std::ios::beg);
-    stream.read(data.data(), data.size());
-    stream.close();
-
-    Parser parser(std::string(data.begin(), data.end()));
-
     try {
-        RootNode root(parser, nullptr);
+        RootNode root = RootNode::fromFile(args[1]);
+        root.add(RootNode::fromFile("standard.page"));
         NodeList list(&root);
-        fmt::print("{}\n", list.toString());
-//        root.verify();
+//        fmt::print("{}\n", list.toString());
+        root.verify();
+        fmt::print("{}\n", JsRoot(&root).build());
     } catch (const ParseError &e) {
         fmt::print("{}\n", e.what());
     } catch (const VerifyError &e) {
+        fmt::print("{}\n", e.what());
+    } catch (const CompileError &e) {
         fmt::print("{}\n", e.what());
     }
 

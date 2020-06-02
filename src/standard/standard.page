@@ -1,0 +1,12 @@
+page view { }
+page scene { }
+
+page Text {
+	init(text = '') { }
+	init(text: Number) { }
+}
+
+page Button {
+	init(text = '', click: Function?) { }
+	init(text: Number, click: Function?) { }
+}

@@ -83,6 +83,10 @@ bool Parameters::map(std::vector<Node *> values, std::map<std::string, size_t> n
     return true;
 }
 
+bool MethodNode::isMethod() {
+    return parent->type == Type::Type;
+}
+
 Parameters MethodNode::parameters() {
     Parameters result;
 
@@ -95,7 +99,7 @@ Parameters MethodNode::parameters() {
     }
 
     if (parentType) {
-        parentType->searchHere([&result](Node *node) {
+        parentType->searchChildren([&result](Node *node) {
             if (node->type == Type::Variable) {
                 VariableNode *var = node->as<VariableNode>();
 
@@ -112,7 +116,7 @@ Parameters MethodNode::parameters() {
     }
 
     if (parentType) {
-        parentType->searchHere([&result](Node *node) {
+        parentType->searchChildren([&result](Node *node) {
             if (node->type == Type::Variable) {
                 VariableNode *var = node->as<VariableNode>();
 
@@ -129,20 +133,20 @@ Parameters MethodNode::parameters() {
 
 void MethodNode::verify() {
     // types of parameters have to exist!!!
-    for (size_t a = 0; a < paramCount; a++) {
-        Typename varType = children[a]->as<VariableNode>()->evaluate();
-
-        if (varType == Typename::number || varType == Typename::boolean || varType == Typename::string) {
-            continue; // these are okay, do not need to be declared
-        }
-
-        Node *node = searchScope([varType](Node *node) {
-            return node->type == Type::Type && varType == Typename(node->as<TypeNode>()->name);
-        });
-
-        if (!node)
-            throw VerifyError("In method {}, parameter declared with unknown type {}.", name, varType.toString());
-    }
+//    for (size_t a = 0; a < paramCount; a++) {
+//        Typename varType = children[a]->as<VariableNode>()->evaluate();
+//
+//        if (varType == Typename::number || varType == Typename::boolean || varType == Typename::string) {
+//            continue; // these are okay, do not need to be declared
+//        }
+//
+//        Node *node = searchScope([varType](Node *node) {
+//            return node->type == Type::Type && varType == Typename(node->as<TypeNode>()->name);
+//        });
+//
+//        if (!node)
+//            throw VerifyError("In method {}, parameter declared with unknown type {}.", name, varType.toString());
+//    }
 
     searchHere([this](Node *node) {
         if (node == this)
@@ -159,19 +163,21 @@ void MethodNode::verify() {
                     auto *thisParam = children[thisIndex]->as<VariableNode>();
                     auto *thatParam = method->children[thatIndex]->as<VariableNode>();
 
-                    if (thisParam->evaluate().optional) {
+                    Typename thisType = thisParam->evaluate();
+                    Typename thatType = thatParam->evaluate();
+
+                    if (thisType.optional) {
                         thisIndex++;
                         continue;
                     }
 
-                    if (thatParam->evaluate().optional) {
+                    if (thatType.optional) {
                         thatIndex++;
                         continue;
                     }
 
                     // first child must exist in method expression
-                    if (thisParam->children[0]->as<TypenameNode>()->content
-                        != thatParam->children[0]->as<TypenameNode>()->content)
+                    if (thisType != thatType)
                         break;
 
                     thisIndex++;
@@ -220,6 +226,10 @@ Typename MethodNode::evaluateReturn() {
     } else {
         return Typename::null; // maybe error?
     }
+}
+
+Node *MethodNode::body() {
+    return children[paramCount + hasReturnType].get();
 }
 
 MethodNode::MethodNode(Node *parent) : Node(parent, Type::Method), init(true) {

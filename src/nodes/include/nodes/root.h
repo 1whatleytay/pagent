@@ -3,6 +3,11 @@
 #include <nodes/node.h>
 
 class RootNode : public Node {
+    std::string path;
 public:
-    RootNode(Parser &parser, Node *parent);
+    void add(const RootNode &node);
+
+    static RootNode fromFile(const std::string &path);
+
+    RootNode(Parser &parser, Node *parent, const std::string &path);
 };

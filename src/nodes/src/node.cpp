@@ -18,6 +18,7 @@ bool Typename::operator==(const Typename &value) const {
            && array == value.array
            && function == value.function
            && children == value.children
+           && paramCount == value.paramCount
         /* && optional == value.optional*/;
 }
 
@@ -49,8 +50,6 @@ std::string getName(Node *node) {
         case Node::Type::Enum:
             return node->as<EnumNode>()->name;
         case Node::Type::Type:
-            return node->as<TypeNode>()->name;
-        case Node::Type::Page:
             return node->as<TypeNode>()->name;
         case Node::Type::Method:
             return node->as<MethodNode>()->name;

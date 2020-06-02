@@ -53,7 +53,6 @@ public:
         Typename,
         Method,
         Statement,
-        Page,
         Route,
         Number,
         Lambda,
