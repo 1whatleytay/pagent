@@ -18,6 +18,8 @@ std::vector<OperatorRule<ExpressionNode::Operator>> unaryRules = {
 
 std::vector<OperatorRule<ExpressionNode::Operator>> binaryRules = {
     { ExpressionNode::Operator::Literal, { { "-", ">" } }, /*cancel:*/ true },
+    { ExpressionNode::Operator::Literal, { { "/", "/" } }, /*cancel:*/ true },
+    { ExpressionNode::Operator::Literal, { { "/", "*" } }, /*cancel:*/ true },
     { ExpressionNode::Operator::Assign, { { "=" } } },
     { ExpressionNode::Operator::AddAssign, { { "+", "=" } } },
     { ExpressionNode::Operator::SubtractAssign, { { "-", "=" } } },
@@ -89,6 +91,9 @@ Typename ExpressionNode::evaluate(std::vector<Node *> visited) {
                     return children[0]->as<ReferenceNode>()->evaluate(visited);
                 case Type::Array:
                     return children[0]->as<ArrayNode>()->evaluate(visited);
+                case Type::If:
+                    // make if evaluate this
+                    return children[0]->as<IfNode>()->children[1]->as<ExpressionNode>()->evaluate(visited);
                 default:
                     return Typename::null;
             }

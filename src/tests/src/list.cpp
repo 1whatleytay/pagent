@@ -6,9 +6,11 @@
 #include <nodes/type.h>
 #include <nodes/array.h>
 #include <nodes/lambda.h>
-#include <nodes/method.h>
+#include <nodes/function.h>
 #include <nodes/number.h>
 #include <nodes/string.h>
+#include <nodes/comment.h>
+#include <nodes/enumname.h>
 #include <nodes/typename.h>
 #include <nodes/variable.h>
 #include <nodes/reference.h>
@@ -65,7 +67,11 @@ std::string NodeList::getLine(Node *node) {
             return "Code";
         case Node::Type::Enum: {
             EnumNode *e = node->as<EnumNode>();
-            return fmt::format("Enum \"{}\" {{ {} }}", e->name, fmt::join(e->elements, ", "));
+            return fmt::format("Enum \"{}\"", e->name);
+        }
+        case Node::Type::Enumname: {
+            EnumnameNode *e = node->as<EnumnameNode>();
+            return fmt::format("Enumname \"{}\"", e->name);
         }
         case Node::Type::Type: {
             TypeNode *e = node->as<TypeNode>();
@@ -96,8 +102,8 @@ std::string NodeList::getLine(Node *node) {
             TypenameNode *e = node->as<TypenameNode>();
             return fmt::format("Typename \"{}\"", e->content.toString());
         }
-        case Node::Type::Method: {
-            MethodNode *e = node->as<MethodNode>();
+        case Node::Type::Function: {
+            FunctionNode *e = node->as<FunctionNode>();
             return fmt::format("Method{} {{ #{} }}{}",
                 e->init ? "" : fmt::format(" \"{}\"", e->name), e->paramCount, e->init ? " + init" : "");
         }
@@ -128,6 +134,10 @@ std::string NodeList::getLine(Node *node) {
         case Node::Type::Array: {
             ArrayNode *e = node->as<ArrayNode>();
             return fmt::format("Array \"{}\"", e->evaluate().toString());
+        }
+        case Node::Type::Comment: {
+            CommentNode *e = node->as<CommentNode>();
+            return fmt::format("Comment \"{}\"", e->content);
         }
         default:
             return "Unknown";

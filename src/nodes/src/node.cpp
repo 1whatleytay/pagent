@@ -2,7 +2,8 @@
 
 #include <nodes/enum.h>
 #include <nodes/type.h>
-#include <nodes/method.h>
+#include <nodes/enumname.h>
+#include <nodes/function.h>
 #include <nodes/variable.h>
 
 const Typename Typename::any = Typename("Any");
@@ -26,6 +27,12 @@ bool Typename::operator!=(const Typename &value) const {
     return !operator==(value);
 }
 
+Typename Typename::asOptional(bool value) const {
+    Typename result = *this;
+    result.optional = value;
+    return result;
+}
+
 std::string Typename::toString() const {
     if (function) {
         std::vector<std::string> params(paramCount);
@@ -43,7 +50,13 @@ std::string Typename::toString() const {
     }
 }
 
-Typename::Typename(std::string name, bool optional) : name(move(name)), optional(optional) { }
+Typename::Typename(std::string name) : name(move(name)) { }
+Typename::Typename(std::vector<Typename> params)
+    : paramCount(params.size()), children(move(params)), function(true) { }
+Typename::Typename(std::vector<Typename> params, Typename returnType)
+    : paramCount(params.size() + 1), children(move(params)), function(true) {
+    children.push_back(returnType);
+}
 
 std::string getName(Node *node) {
     switch (node->type) {
@@ -51,8 +64,10 @@ std::string getName(Node *node) {
             return node->as<EnumNode>()->name;
         case Node::Type::Type:
             return node->as<TypeNode>()->name;
-        case Node::Type::Method:
-            return node->as<MethodNode>()->name;
+        case Node::Type::Enumname:
+            return node->as<EnumnameNode>()->name;
+        case Node::Type::Function:
+            return node->as<FunctionNode>()->name;
         case Node::Type::Variable:
             return node->as<VariableNode>()->name;
         default:

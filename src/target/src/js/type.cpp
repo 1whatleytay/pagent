@@ -1,51 +1,44 @@
-#include <target/js/type.h>
-
-#include <target/js/root.h>
-#include <target/js/expression.h>
+#include <target/js/context.h>
 
 #include <nodes/type.h>
+#include <nodes/function.h>
 #include <nodes/expression.h>
 
 #include <fmt/format.h>
 
-std::string JsType::build() {
+#include <sstream>
+
+std::string JsContext::genType(TypeNode *node) {
     std::stringstream body;
-
-    for (const auto &variable : variables) {
-        body << variable.second->build();
-    }
-
-    for (const auto &method : methods) {
-        body << method.second->build();
-    }
-
-    if (isPage) {
-        body <<  fmt::format("$template() {{\n{}\n}}", indent(templateBody.build()));
-    }
-
-    return fmt::format("class {}{} {{\n{}\n}}", name, isPage ? " extends $Component" : "", indent(body.str()));
-}
-
-JsType::JsType(JsRoot &root, TypeNode *node) : root(root) {
-    name = node->name;
-    isPage = node->isPage;
+    std::stringstream global;
 
     for (const auto &child : node->children) {
         switch (child->type) {
             case Node::Type::Variable:
-                variables[child->as<VariableNode>()] = std::make_shared<JsAction>(root, child->as<VariableNode>());
+                if (child->as<VariableNode>()->shared)
+                    global << "\n" << genVariable(child->as<VariableNode>());
+                else
+                    body << "\n" << genVariable(child->as<VariableNode>());
                 break;
-            case Node::Type::Route:
-                break; // should be scanned by parent
+
             case Node::Type::Expression: // parsed as expression but is really UI, should be shown in template
-                templateBody.addStatement(
-                    fmt::format("return {}", jsExpression(root, child->as<ExpressionNode>(), true)));
+                body << fmt::format("\n$template() {{\n{}\n}}",
+                    indent(fmt::format("return {}", genExpression(child->as<ExpressionNode>()))));
                 break;
-            case Node::Type::Method:
-                methods[child->as<MethodNode>()] = std::make_shared<JsFunction>(root, child->as<MethodNode>());
+
+            case Node::Type::Function:
+                body << genFunction(child->as<FunctionNode>());
                 break;
+
+            case Node::Type::Route:
+            case Node::Type::Comment:
+                break; // OK
+
             default:
                 assert(false);
         }
     }
+
+    return fmt::format("\nclass {}{} {{{}\n}}{}",
+        reserveName(node), node->isPage ? " extends $Component" : "", indent(body.str()), global.str());
 }

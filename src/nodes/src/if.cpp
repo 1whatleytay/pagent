@@ -8,12 +8,7 @@ bool IfNode::hasValue() {
     return children[1]->type == Type::Expression;
 }
 
-IfNode::IfNode(Parser &parser, Node *parent) : Node(parent, Type::If) {
-    if (parser.next() != "if")
-        throw ParseError(parser, "Internal if error, expected if.");
-
-    children.push_back(ExpressionNode::parse(parser, this));
-
+void IfNode::parseBody(Parser &parser) {
     if (parser.peek() == "-") {
         parser.next(); // -
 
@@ -49,6 +44,31 @@ IfNode::IfNode(Parser &parser, Node *parent) : Node(parent, Type::If) {
                 throw ParseError(parser, "Expected {{ for if body.");
 
             children.push_back(body);
+        }
+    }
+}
+
+IfNode::IfNode(Parser &parser, Node *parent) : Node(parent, Type::If) {
+    if (parser.next() != "if")
+        throw ParseError(parser, "Internal if error, expected if.");
+
+    children.push_back(ExpressionNode::parse(parser, this));
+
+    parseBody(parser);
+
+    while (parser.peek() == "else") {
+        parser.next(); // else
+
+        if (parser.peek() == "if") {
+            parser.next(); // if
+
+            children.push_back(ExpressionNode::parse(parser, this));
+
+            parseBody(parser);
+        } else {
+            parseBody(parser);
+
+            break;
         }
     }
 }

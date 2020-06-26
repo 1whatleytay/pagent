@@ -5,9 +5,10 @@
 class EnumNode : public Node {
 public:
     std::string name;
-    std::vector<std::string> elements;
 
     void verify() override;
+
+    Typename evaluate();
 
     EnumNode(Parser &parser, Node *parent);
 };

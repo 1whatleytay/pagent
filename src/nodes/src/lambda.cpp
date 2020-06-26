@@ -26,7 +26,7 @@ LambdaNode::LambdaNode(Parser &parser, Node *parent) : Node(parent, Type::Lambda
             if (parser.peek() == ")")
                 break;
 
-            children.push_back(std::make_shared<VariableNode>(parser, this, false));
+            children.push_back(std::make_shared<VariableNode>(parser, this, false, false));
             paramCount++;
 
             if (parser.peek() == ",")

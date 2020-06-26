@@ -18,10 +18,10 @@ public:
 
     std::vector<Typename> children;
 
-    // more to be added, arrays or generics, for example
-
     bool operator==(const Typename &value) const;
     bool operator!=(const Typename &value) const;
+
+    Typename asOptional(bool value = true) const;
 
     std::string toString() const;
 
@@ -33,7 +33,9 @@ public:
     const static Typename empty;
 
     Typename() = default;
-    explicit Typename(std::string name, bool optional = false);
+    Typename(std::string name);
+    Typename(std::vector<Typename> params); // function
+    Typename(std::vector<Typename> params, Typename returnType); // function return
 };
 
 using NodeChecker = std::function<bool(class Node *)>;
@@ -44,14 +46,16 @@ public:
         Root,
         Code,
         Enum,
+        Enumname,
         Type,
         Variable,
         Expression,
+        Comment,
         If,
         For,
         String,
         Typename,
-        Method,
+        Function,
         Statement,
         Route,
         Number,

@@ -7,7 +7,5 @@ class RootNode : public Node {
 public:
     void add(const RootNode &node);
 
-    static RootNode fromFile(const std::string &path);
-
     RootNode(Parser &parser, Node *parent, const std::string &path);
 };

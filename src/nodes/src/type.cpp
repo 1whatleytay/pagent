@@ -1,7 +1,8 @@
 #include <nodes/type.h>
 
 #include <nodes/route.h>
-#include <nodes/method.h>
+#include <nodes/comment.h>
+#include <nodes/function.h>
 #include <nodes/variable.h>
 #include <nodes/attributes.h>
 #include <nodes/expression.h>
@@ -45,7 +46,7 @@ TypeNode::TypeNode(Parser &parser, Node *parent) : Node(parent, Type::Type) {
         if (parser.peek() == "}")
             break;
 
-        auto attributes = parseAttributes(parser, { "init", "implicit", "native" });
+        auto attributes = parseAttributes(parser, { "init", "implicit", "native", "shared" });
 
         std::string next = parser.next();
         std::string action = parser.peek();
@@ -56,7 +57,7 @@ TypeNode::TypeNode(Parser &parser, Node *parent) : Node(parent, Type::Type) {
                 throw ParseError(parser, "Attribute implicit used on variable declaration.");
 
             parser.next(); // var
-            children.push_back(std::make_shared<VariableNode>(parser, this, attributes["init"]));
+            children.push_back(std::make_shared<VariableNode>(parser, this, attributes["init"], attributes["shared"]));
         } else if (next == "fun") {
             if (attributes["init"])
                 throw ParseError(parser, "Internal type error, wrong init branch.");
@@ -65,9 +66,9 @@ TypeNode::TypeNode(Parser &parser, Node *parent) : Node(parent, Type::Type) {
                 throw ParseError(parser, "Attribute implicit used on variable declaration.");
 
             parser.next(); // fun
-            children.push_back(std::make_shared<MethodNode>(parser, this, false, false));
+            children.push_back(std::make_shared<FunctionNode>(parser, this, false, false));
         } else if (attributes["init"] && (next == "(" || next == "{")) { // constructor is special
-            children.push_back(std::make_shared<MethodNode>(parser, this, true, attributes["implicit"]));
+            children.push_back(std::make_shared<FunctionNode>(parser, this, true, attributes["implicit"]));
         } else if (next == "route") {
             if (!isPage)
                 throw ParseError(parser, "Route element can only be used on page components.");
@@ -80,16 +81,33 @@ TypeNode::TypeNode(Parser &parser, Node *parent) : Node(parent, Type::Type) {
             // expression nodes can be assumed to be UI view/scene nodes
             children.push_back(ExpressionNode::parse(parser, this));
         } else {
-            throw ParseError(parser, "Unknown action character {}, in type {}, with name {}.", action, name, next);
+            size_t point = parser.select();
+
+            // working in comments T_T
+            if (parser.next() == "/" && parser.next() == "/") {
+                parser.jump(point);
+                children.push_back(std::make_shared<CommentNode>(parser, this));
+            } else {
+                parser.jump(point);
+
+                if (parser.next() == "/" && parser.next() == "*") {
+                    parser.jump(point);
+                    children.push_back(std::make_shared<CommentNode>(parser, this));
+                } else {
+                    parser.jump(point);
+                    throw ParseError(parser,
+                        "Unknown action character {}, in type {}, with name {}.", action, name, next);
+                }
+            }
         }
     }
 
     if (parser.next() != "}")
         throw ParseError(parser, "Internal type error, expected }}.");
 
-    Node *firstInit = searchThis([](Node *node) { return node->type == Type::Method && node->as<MethodNode>()->init; });
+    Node *firstInit = searchThis([](Node *node) { return node->type == Type::Function && node->as<FunctionNode>()->init; });
 
     if (!firstInit) {
-        children.push_back(std::make_shared<MethodNode>(this)); // default init
+        children.push_back(std::make_shared<FunctionNode>(this)); // default init
     }
 }

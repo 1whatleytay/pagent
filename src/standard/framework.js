@@ -7,23 +7,49 @@ class $Component {
 
     $reload() {
         document.getElementById(this.$uuid).innerHTML = this.$template()
+        return this
     }
 
     $render() {
         this.$uuid = $nextId()
         return `<div id="${this.$uuid}">${this.$template()}</div>`
     }
+
+    $build() {
+        return this
+    }
 }
 
-// function $insert(param) {
-//     if (param instanceof String) {
-//         return param.replace('<', '&lt;').replace('>', '$gt;')
-//     } else if (Array.isArray(param)) {
-//         return param.join('')
-//     } else if (parma instanceof $Component) {
-//         return $insert(param.$render())
-//     }
-// }
+function $alignStyle(value) {
+    switch (value) {
+        case 'center':
+            return ''
+        case 'left':
+            return ''
+        case 'right':
+            return ''
+        default:
+            return 0
+    }
+}
+
+function $clean(text) {
+    return text
+        .replace('&', '&amp;')
+        .replace(';', '&semi;')
+        .replace('<', '&lt;')
+        .replace('>', '$gt;')
+}
+
+function $insert(param) {
+    if (Array.isArray(param)) {
+        return param.join('')
+    } else if (param instanceof $Component) {
+        return $insert(param.$render())
+    } else {
+        return param
+    }
+}
 
 let $id = 0
 
@@ -45,7 +71,7 @@ function $callEvent(event) {
 }
 
 function $load() {
-    document.getElementById('app').innerHTML = $route(window.location.href).$build().$render()
+    document.getElementById('app').innerHTML = $route(window.location.pathname).$build().$render()
 }
 
 window.onload = $load

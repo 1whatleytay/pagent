@@ -1,6 +1,6 @@
 #include <nodes/statement.h>
 
-#include <nodes/method.h>
+#include <nodes/function.h>
 #include <nodes/variable.h>
 #include <nodes/expression.h>
 
@@ -10,13 +10,13 @@ void StatementNode::verify() {
             if (!children.empty()) {
                 Node *node = parent;
 
-                while (node && node->type != Type::Method)
+                while (node && node->type != Type::Function)
                     node = node->parent;
 
                 if (!node)
                     throw VerifyError("Internal statement error, could not find parent method for return.");
 
-                auto *method = node->as<MethodNode>();
+                auto *method = node->as<FunctionNode>();
 
                 if (!method->hasReturnType)
                     throw VerifyError("Internal statement error, return has expression but method returns nothing.");
@@ -50,13 +50,13 @@ StatementNode::StatementNode(Parser &parser, Node *parent) : Node(parent, Type::
 
         Node *node = parent;
 
-        while (node && node->type != Type::Method)
+        while (node && node->type != Type::Function)
             node = node->parent;
 
         if (!node)
             throw ParseError(parser, "Internal statement error, could not find parent method for return.");
 
-        if (node->as<MethodNode>()->hasReturnType)
+        if (node->as<FunctionNode>()->hasReturnType)
             children.push_back(ExpressionNode::parse(parser, this));
 
         return;

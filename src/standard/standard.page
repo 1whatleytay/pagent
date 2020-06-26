@@ -1,12 +1,40 @@
+enum Align { left right center }
+
+type Color {
+    init var hex = '000000'
+
+    // From TailwindCSS
+    shared var gray = Color('A0AEC0')
+    shared var red = Color('F56565')
+    shared var orange = Color('ED8936')
+    shared var yellow = Color('ECC94B')
+    shared var green = Color('48BB78')
+    shared var teal = Color('38B2AC')
+    shared var blue = Color('4299E1')
+    shared var indigo = Color('667EEA')
+    shared var purple = Color('9F7AEA')
+    shared var pink = Color('ED64A6')
+    shared var black = Color('000000')
+    shared var white = Color('FFFFFF')
+}
+
 page view { }
 page scene { }
 
 page Text {
+    init var textSize: Number?
+    init var textColor: Color?
+    init var textAlign: Align?
+
 	init(text = '') { }
 	init(text: Number) { }
 }
 
 page Button {
-	init(text = '', click: Function?) { }
-	init(text: Number, click: Function?) { }
+    init var textSize: Number?
+    init var textColor: Color?
+    init var textAlign: Align?
+
+	init(text = '') { }
+	init(text: Number) { }
 }

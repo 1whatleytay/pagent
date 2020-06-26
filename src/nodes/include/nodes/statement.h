@@ -2,7 +2,7 @@
 
 #include <nodes/node.h>
 
-class MethodNode;
+class FunctionNode;
 
 class StatementNode : public Node {
 public:

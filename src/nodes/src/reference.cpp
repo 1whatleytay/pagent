@@ -1,10 +1,14 @@
 #include <nodes/reference.h>
 
 #include <nodes/code.h>
+#include <nodes/enum.h>
 #include <nodes/type.h>
-#include <nodes/method.h>
+#include <nodes/enumname.h>
+#include <nodes/function.h>
 #include <nodes/variable.h>
 #include <nodes/expression.h>
+
+#include <sstream>
 
 ReferenceNode *ReferenceNode::next() {
     size_t nextIndex = 0;
@@ -20,14 +24,17 @@ ReferenceNode *ReferenceNode::next() {
     return nullptr;
 }
 
-TypeNode *ReferenceNode::findType(Node *referenced) {
+Node *ReferenceNode::findType(Node *referenced) {
     Typename extendType;
 
     if (hasCall || hasContent) {
-        extendType = referenced->as<MethodNode>()->evaluateReturn();
+        extendType = referenced->as<FunctionNode>()->evaluateReturn();
     } else {
-        if (referenced->type == Type::Method)
-            extendType = referenced->as<MethodNode>()->evaluate();
+        if (referenced->type == Type::Type || referenced->type == Type::Enum)
+            return referenced;
+
+        if (referenced->type == Type::Function)
+            extendType = referenced->as<FunctionNode>()->evaluate();
         else
             extendType = referenced->as<VariableNode>()->evaluate();
     }
@@ -82,7 +89,7 @@ std::vector<Node *> ReferenceNode::dereferenceThis(Node *reference) {
         result.clear();
 
         typeNode->searchChildren([&result](Node *node) {
-            if (node->type == Type::Method && node->as<MethodNode>()->init)
+            if (node->type == Type::Function && node->as<FunctionNode>()->init)
                 result.push_back(node);
 
             return false;
@@ -100,22 +107,42 @@ Node *ReferenceNode::selectFrom(const std::vector<Node *> &nodes) {
     if (nodes.empty())
         throw VerifyError("Node dereferenced to nothing.");
 
-    if (nodes[0]->type == Type::Method && (hasCall || hasContent)) {
+    if (nodes[0]->type == Type::Function && (hasCall || hasContent)) {
         std::vector<Node *> values = getParameters();
 
+        std::vector<std::string> errors;
+
         for (Node *node : nodes) {
-            if (node->type != Type::Method)
+            if (node->type != Type::Function)
                 throw VerifyError("Reference referred to method type but found non method type with same name.");
 
-            std::vector<ssize_t> temp;
+            MapResult map = node->as<FunctionNode>()->parameters().map(values, names);
 
-            bool matches = node->as<MethodNode>()->parameters().map(values, names, temp);
-
-            if (matches)
+            if (map.matches)
                 return node;
+            else
+                errors.push_back(map.error);
         }
 
-        throw VerifyError("Could not find a matching method for {}.", content);
+        std::stringstream stream;
+        stream << fmt::format("Could not match function call to {}\n", content);
+
+        for (size_t a = 0; a < nodes.size(); a++) {
+            FunctionNode *node = nodes[a]->as<FunctionNode>();
+
+            Parameters params = node->as<FunctionNode>()->parameters();
+
+            std::vector<std::string> paramNames(params.size());
+
+            for (size_t b = 0; b < params.size(); b++) {
+                paramNames[b] = fmt::format("{}: {}", params[b].name, params[b].type.toString());
+            }
+
+            stream << fmt::format("\tTried: {}({})\n", node->name, fmt::join(paramNames, ", "));
+            stream << fmt::format("\tProblem: {}\n", errors[a]);
+        }
+
+        throw VerifyError("{}", stream.str());
     } else {
         if (nodes.size() != 1)
             throw VerifyError("Node was Type or Variable but dereferenced to multiple nodes.");
@@ -152,13 +179,17 @@ Typename ReferenceNode::evaluate(std::vector<Node *> visited) {
     switch (node->type) {
         case Type::Variable:
             return node->as<VariableNode>()->evaluate(visited);
-        case Type::Method:
+        case Type::Function:
             if (!hasCall && !hasContent)
-                return node->as<MethodNode>()->evaluate();
+                return node->as<FunctionNode>()->evaluate();
             else
-                return node->as<MethodNode>()->evaluateReturn();
+                return node->as<FunctionNode>()->evaluateReturn();
         case Type::Type:
             return node->as<TypeNode>()->evaluate();
+        case Type::Enum:
+            return node->as<EnumNode>()->evaluate();
+        case Type::Enumname:
+            return node->parent->as<EnumNode>()->evaluate();
         default:
             throw VerifyError("Reference referred to unknown type.");
     }

@@ -1,5 +1,7 @@
 #include <nodes/enum.h>
 
+#include <nodes/enumname.h>
+
 void EnumNode::verify() {
     searchHere([this](Node *node) {
         if (node == this)
@@ -14,6 +16,10 @@ void EnumNode::verify() {
     Node::verify();
 }
 
+Typename EnumNode::evaluate() {
+    return Typename(name);
+}
+
 EnumNode::EnumNode(Parser &parser, Node *parent) : Node(parent, Type::Enum) {
     if (parser.next() != "enum")
         throw ParseError(parser, "Internal error, expected enum.");
@@ -24,14 +30,14 @@ EnumNode::EnumNode(Parser &parser, Node *parent) : Node(parent, Type::Enum) {
         throw ParseError(parser, "Expected {{ after enum name, but got {}.", parser.last());
 
     while (!parser.empty()) {
-        std::string next = parser.next();
-
-        if (next == "}")
+        if (parser.peek() == "}")
             break;
 
-        elements.push_back(next);
+        children.push_back(std::make_shared<EnumnameNode>(parser, this));
 
         if (parser.peek() == ",")
             parser.next();
     }
+
+    parser.next(); // }
 }

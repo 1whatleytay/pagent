@@ -16,7 +16,7 @@ public:
     std::map<std::string, size_t> names;
 
     ReferenceNode *next();
-    TypeNode *findType(Node *referenced);
+    Node *findType(Node *referenced);
 
     std::vector<Node *> dereference(Node *reference = nullptr);
     std::vector<Node *> dereferenceThis(Node *reference = nullptr);

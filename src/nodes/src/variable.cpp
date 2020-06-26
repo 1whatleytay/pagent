@@ -48,8 +48,8 @@ Typename VariableNode::evaluate(std::vector<Node *> visited) {
 VariableNode::VariableNode(std::string name, Node *parent)
     : Node(parent, Type::Variable), name(move(name)), fake(true) { }
 
-VariableNode::VariableNode(Parser &parser, Node *parent, bool init)
-    : Node(parent, Type::Variable), init(init) {
+VariableNode::VariableNode(Parser &parser, Node *parent, bool init, bool shared)
+    : Node(parent, Type::Variable), init(init), shared(shared) {
     name = parser.next();
 
     if (parser.peek() == ":") {

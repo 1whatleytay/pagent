@@ -1,35 +1,33 @@
-#include <target/js/function.h>
-
-#include <target/js/root.h>
-#include <target/js/expression.h>
+#include <target/js/context.h>
 
 #include <nodes/code.h>
+#include <nodes/function.h>
 #include <nodes/expression.h>
 
-std::string JsFunction::build() {
-    return fmt::format("{}{}({}) {{ {} }}\n",
-        isMethod ? "" : "function ", name, fmt::join(paramNames, ", "), indent(content));
-}
-
-JsFunction::JsFunction(JsRoot &root, MethodNode *node) {
-    name = node->name;
-
-    if (node->init)
-        name = "$build";
-    isMethod = node->isMethod();
-
+std::string JsContext::genFunction(FunctionNode *node) {
     Parameters params = node->parameters();
 
-    paramNames.resize(params.parameters.size());
-    for (size_t a = 0; a < params.parameters.size(); a++) {
-        paramNames[a] = params.parameters[a].name;
+    std::vector<std::string> paramNames(params.size());
+    for (size_t a = 0; a < params.size(); a++) {
+        if (params[a].reference)
+            paramNames[a] = reserveName(params[a].reference);
+        else
+            paramNames[a] = params[a].name;
     }
 
     Node *body = node->body();
 
+    std::string content;
+
     if (body->type == Node::Type::Expression) {
-        content = fmt::format("return {}", jsExpression(root, body->as<ExpressionNode>()));
+        content = fmt::format("return {}", genExpression(body->as<ExpressionNode>()));
     } else if (body->type == Node::Type::Code) {
-        content = jsBody(root, body->as<CodeNode>());
+        content = genCode(body->as<CodeNode>());
     }
+
+    if (node->init)
+        content += "\nreturn this";
+
+    return fmt::format("\n{}{}({}) {{ {}\n}}",
+        node->isMethod() ? "" : "function ", reserveName(node), fmt::join(paramNames, ", "), indent(content));
 }

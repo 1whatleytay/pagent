@@ -13,10 +13,11 @@ public:
     std::string name;
     bool hasExplicitType = false;
 
+    bool init = false;
     bool fake = false;
+    bool shared = false;
     Evaluator evaluator;
 
-    bool init = false;
 
     void verify() override;
 
@@ -26,5 +27,5 @@ public:
     Typename evaluate(std::vector<Node *> visited = { });
 
     VariableNode(std::string name, Node *parent);
-    VariableNode(Parser &parser, Node *parent, bool init);
+    VariableNode(Parser &parser, Node *parent, bool init = false, bool shared = false);
 };

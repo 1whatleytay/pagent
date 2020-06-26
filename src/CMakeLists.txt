@@ -1,8 +1,14 @@
+add_subdirectory(sockets)
+add_subdirectory(http)
 add_subdirectory(nodes)
 add_subdirectory(tests)
 add_subdirectory(target)
+add_subdirectory(cli)
 
 add_executable(page main.cpp)
-target_link_libraries(page PUBLIC nodes tests target fmt)
+target_link_libraries(page PUBLIC cli)
 
 configure_file(standard/standard.page ${CMAKE_CURRENT_BINARY_DIR}/standard.page COPYONLY)
+configure_file(standard/index.html ${CMAKE_CURRENT_BINARY_DIR}/index.html COPYONLY)
+configure_file(standard/framework.js ${CMAKE_CURRENT_BINARY_DIR}/framework.js COPYONLY)
+configure_file(standard/framework.css ${CMAKE_CURRENT_BINARY_DIR}/framework.css COPYONLY)

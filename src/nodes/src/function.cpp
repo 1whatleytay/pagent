@@ -1,23 +1,38 @@
-#include <nodes/method.h>
+#include <nodes/function.h>
 
 #include <nodes/code.h>
 #include <nodes/type.h>
 #include <nodes/typename.h>
 #include <nodes/variable.h>
-#include <nodes/statement.h>
 #include <nodes/attributes.h>
 #include <nodes/expression.h>
+
+std::vector<Parameter> styleParameters = {
+    { Typename("Color").asOptional(), "color" },
+    { Typename("Align").asOptional(), "align" },
+    { Typename::number.asOptional(), "width" },
+    { Typename::number.asOptional(), "height" },
+    { Typename::number.asOptional(), "column" },
+    { Typename::number.asOptional(), "row" },
+    { Typename::number.asOptional(), "padding" },
+    { Typename::number.asOptional(), "margin" },
+    { Typename(std::vector<Typename> { }).asOptional(), "click" },
+    { Typename(std::vector<Typename> { }).asOptional(), "mouseEnter" },
+    { Typename(std::vector<Typename> { }).asOptional(), "mouseExit" },
+};
+
+MapResult::MapResult(std::string error) : matches(false), error(move(error)) { }
 
 void Parameters::add(Node *node) {
     VariableNode *var = node->as<VariableNode>();
     Typename varType = var->evaluate();
 
-    parameters.push_back({ varType, var->name, node });
+    push_back({ varType, var->name, node });
 }
 
 ssize_t Parameters::find(const std::string &name) {
-    for (size_t a = 0; a < parameters.size(); a++) {
-        if (parameters[a].name == name)
+    for (size_t a = 0; a < size(); a++) {
+        if (operator[](a).name == name)
             return a;
     }
 
@@ -25,31 +40,32 @@ ssize_t Parameters::find(const std::string &name) {
 }
 
 // this is going to brainf**k me
-bool Parameters::map(std::vector<Node *> values, std::map<std::string, size_t> names, std::vector<ssize_t> &result) {
-    // empty return on no match, but also empty return if there are no expressions but it is a valid match
-    result.resize(values.size(), -1);
+MapResult Parameters::map(std::vector<Node *> values, std::map<std::string, size_t> names) {
+    MapResult result;
 
-    std::vector<bool> usedParameter(parameters.size());
+    // empty return on no match, but also empty return if there are no expressions but it is a valid match
+    result.map.resize(values.size(), -1);
+
+    std::vector<bool> usedParameter(size());
 
     for (const auto &name : names) {
         ssize_t index = find(name.first);
 
         if (index == -1)
-            return false;
+            return MapResult(fmt::format("No parameter named {}.", name.first));
 
         Typename expType = values[name.second]->as<ExpressionNode>()->evaluate();
 
-        if (expType != parameters[index].type)
-            return false; // does not match
-//            throw VerifyError("Parameter with name {} and type {} is incompatible with type {}.",
-//                parameters[index].name, parameters[index].type.toString(), expType.toString());
+        if (expType != operator[](index).type)
+            return MapResult(fmt::format("Expression with type {} does not match parameter {} with type {}.",
+                expType.toString(), operator[](index).name, operator[](index).type.toString()));
 
-        result[name.second] = index;
+        result.map[name.second] = index;
         usedParameter[index] = true;
     }
 
-    for (size_t a = 0; a < result.size(); a++) {
-        if (result[a] != -1)
+    for (size_t a = 0; a < values.size(); a++) {
+        if (result.map[a] != -1)
             continue;
 
         size_t nextParameter;
@@ -59,40 +75,46 @@ bool Parameters::map(std::vector<Node *> values, std::map<std::string, size_t> n
         }
 
         if (nextParameter >= usedParameter.size())
-            return false; // does not match
-//            throw VerifyError("Too many expressions in method call.");
+            return MapResult(fmt::format("Too many parameters, {} expected, {} passed.", size(), values.size()));
 
         Typename expType = values[a]->as<ExpressionNode>()->evaluate();
 
-        if (expType != parameters[nextParameter].type)
-            return false; // does not match
+        if (expType != operator[](nextParameter).type)
+            return MapResult(fmt::format("Expression with type {} does not match parameter {} with type {}.",
+                expType.toString(), operator[](nextParameter).name, operator[](nextParameter).type.toString()));
 
-        result[a] = nextParameter;
+        result.map[a] = nextParameter;
         usedParameter[nextParameter] = true;
     }
 
     for (size_t a = 0; a < usedParameter.size(); a++) {
         if (!usedParameter[a]) {
-            VariableNode *var = parameters[a].reference->as<VariableNode>();
+            if (!operator[](a).type.optional)
+                return MapResult(fmt::format("Missing value for non-optional parameter {}.", operator[](a).name));
 
-            if (var->children.empty() && !var->evaluate().optional)
-                return false; // does not match
+            // builtins better be optional
+            if (operator[](a).reference) {
+                VariableNode *var = operator[](a).reference->as<VariableNode>();
+
+                if (var->children.empty())
+                    return MapResult(fmt::format("Missing value for non-optional parameter {}.", operator[](a).name));
+            }
         }
     }
 
-    return true;
+    return result;
 }
 
-bool MethodNode::isMethod() {
+bool FunctionNode::isMethod() {
     return parent->type == Type::Type;
 }
 
-Parameters MethodNode::parameters() {
+Parameters FunctionNode::parameters() {
     Parameters result;
 
-    Node *parentType = nullptr;
+    TypeNode *parentType = nullptr;
     if (init) {
-        parentType = searchParents([](Node *node) { return node->type == Type::Type; });
+        parentType = searchParents([](Node *node) { return node->type == Type::Type; })->as<TypeNode>();
 
         if (!parentType)
             throw VerifyError("Internal method error, constructor does not have parent type.");
@@ -103,7 +125,7 @@ Parameters MethodNode::parameters() {
             if (node->type == Type::Variable) {
                 VariableNode *var = node->as<VariableNode>();
 
-                if (var->children.empty() && !var->evaluate().optional)
+                if (var->init && (var->children.empty() && !var->evaluate().optional))
                     result.add(node);
             }
 
@@ -120,18 +142,22 @@ Parameters MethodNode::parameters() {
             if (node->type == Type::Variable) {
                 VariableNode *var = node->as<VariableNode>();
 
-                if (!var->children.empty() || var->evaluate().optional)
+                if (var->init && (!var->children.empty() || var->evaluate().optional))
                     result.add(node);
             }
 
             return false;
         });
+
+        if (parentType->isPage) {
+            result.insert(result.end(), styleParameters.begin(), styleParameters.end());
+        }
     }
 
     return result;
 }
 
-void MethodNode::verify() {
+void FunctionNode::verify() {
     // types of parameters have to exist!!!
 //    for (size_t a = 0; a < paramCount; a++) {
 //        Typename varType = children[a]->as<VariableNode>()->evaluate();
@@ -153,8 +179,8 @@ void MethodNode::verify() {
             return false;
 
         if (name == getName(node)) {
-            if (node->type == Type::Method) { // check params, due to overloading
-                auto *method = node->as<MethodNode>();
+            if (node->type == Type::Function) { // check params, due to overloading
+                auto *method = node->as<FunctionNode>();
 
                 size_t thisIndex = 0;
                 size_t thatIndex = 0;
@@ -200,7 +226,7 @@ void MethodNode::verify() {
     Node::verify();
 }
 
-Typename MethodNode::evaluate() {
+Typename FunctionNode::evaluate() {
     Typename result;
 
     result.function = true;
@@ -213,7 +239,7 @@ Typename MethodNode::evaluate() {
     return result;
 }
 
-Typename MethodNode::evaluateReturn() {
+Typename FunctionNode::evaluateReturn() {
     if (hasReturnType) {
         return children[paramCount]->as<TypenameNode>()->content;
     } else if (init) {
@@ -228,17 +254,17 @@ Typename MethodNode::evaluateReturn() {
     }
 }
 
-Node *MethodNode::body() {
+Node *FunctionNode::body() {
     return children[paramCount + hasReturnType].get();
 }
 
-MethodNode::MethodNode(Node *parent) : Node(parent, Type::Method), init(true) {
+FunctionNode::FunctionNode(Node *parent) : Node(parent, Type::Function), init(true) {
     // default init
     children.push_back(std::make_shared<CodeNode>(this)); // empty body
 }
 
-MethodNode::MethodNode(Parser &parser, Node *parent, bool init, bool implicit)
-    : Node(parent, Type::Method), init(init), implicit(implicit) {
+FunctionNode::FunctionNode(Parser &parser, Node *parent, bool init, bool implicit)
+    : Node(parent, Type::Function), init(init), implicit(implicit) {
 //    assert(!implicit);
 
     if (!init)

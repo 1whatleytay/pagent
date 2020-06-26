@@ -1,9 +1,9 @@
-#include <nodes/root.h>
+#include <nodes/context.h>
 
 #include <nodes/enum.h>
 #include <nodes/type.h>
 #include <nodes/string.h>
-#include <nodes/method.h>
+#include <nodes/function.h>
 #include <nodes/variable.h>
 
 #include <fstream>
@@ -16,18 +16,6 @@ void RootNode::add(const RootNode &node) {
         child->parent = this;
         children.push_back(child);
     }
-}
-
-RootNode RootNode::fromFile(const std::string &path) {
-    std::ifstream stream(path, std::ios::ate);
-    std::vector<char> data(stream.tellg());
-    stream.seekg(0, std::ios::beg);
-    stream.read(data.data(), data.size());
-    stream.close();
-
-    Parser parser(std::string(data.begin(), data.end()));
-
-    return RootNode(parser, nullptr, path);
 }
 
 RootNode::RootNode(Parser &parser, Node *parent, const std::string &path) : Node(parent, Type::Root), path(path) {
@@ -45,10 +33,10 @@ RootNode::RootNode(Parser &parser, Node *parent, const std::string &path) : Node
             children.push_back(std::make_shared<TypeNode>(parser, this));
         } else if (next == "var") {
             parser.next(); // var
-            children.push_back(std::make_shared<VariableNode>(parser, this, false));
+            children.push_back(std::make_shared<VariableNode>(parser, this));
         } else if (next == "fun") {
             parser.next(); // fun
-            children.push_back(std::make_shared<MethodNode>(parser, this, false, false));
+            children.push_back(std::make_shared<FunctionNode>(parser, this, false, false));
         } else if (next == "import") {
             parser.next(); // import
 
@@ -57,9 +45,16 @@ RootNode::RootNode(Parser &parser, Node *parent, const std::string &path) : Node
             if (!location.indices.empty())
                 throw ParseError(parser, "Literals must be constant, no expressions are allowed.");
 
-            std::string importPath = location.text;
+            std::string importText = location.text;
+            std::string importPath = fs::path(path).remove_filename() / importText;
 
-            add(RootNode::fromFile(fs::path(path).remove_filename() / importPath));
+            std::ifstream stream(importPath, std::ios::ate);
+            std::vector<char> data(stream.tellg());
+            stream.seekg(0, std::ios::beg);
+            stream.read(data.data(), data.size());
+
+            Parser importParser(std::string(data.begin(), data.end()));
+            add(RootNode(importParser, nullptr, importPath));
         } else {
             throw ParseError(parser, "Unknown keyword {}.", next);
         }
