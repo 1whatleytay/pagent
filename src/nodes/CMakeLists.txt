@@ -3,8 +3,9 @@ add_library(nodes STATIC
     include/nodes/node.h
     include/nodes/attributes.h
     include/nodes/operator.h
-    include/nodes/context.h
+    include/nodes/root.h
     include/nodes/enum.h
+    include/nodes/boolean.h
     include/nodes/enumname.h
     include/nodes/type.h
     include/nodes/string.h
@@ -25,8 +26,9 @@ add_library(nodes STATIC
 
     src/node.cpp
     src/attributes.cpp
-    src/context.cpp
+    src/root.cpp
     src/enum.cpp
+    src/boolean.cpp
     src/enumname.cpp
     src/type.cpp
     src/string.cpp
@@ -43,8 +45,7 @@ add_library(nodes STATIC
     src/reference.cpp
     src/if.cpp
     src/for.cpp
-    src/array.cpp
-    )
+    src/array.cpp)
 
 target_include_directories(nodes PUBLIC include)
 

@@ -32,7 +32,7 @@ Typename TypeNode::evaluate() {
 TypeNode::TypeNode(Parser &parser, Node *parent) : Node(parent, Type::Type) {
     std::string typeWord = parser.next();
 
-    if (typeWord == "page")
+    if (typeWord == "page" || typeWord == "part")
         isPage = true;
     else if (typeWord != "type")
         throw ParseError(parser, "Internal error, expected type.");
@@ -74,13 +74,13 @@ TypeNode::TypeNode(Parser &parser, Node *parent) : Node(parent, Type::Type) {
                 throw ParseError(parser, "Route element can only be used on page components.");
 
             children.push_back(std::make_shared<RouteNode>(parser, this));
-        } else if (next == "view" || next == "scene") {
+        } /*else if (next == "view" || next == "scene") {
             if (!isPage)
                 throw ParseError(parser, "Element with type {} can only be used on page components.", next);
 
             // expression nodes can be assumed to be UI view/scene nodes
             children.push_back(ExpressionNode::parse(parser, this));
-        } else {
+        } */else {
             size_t point = parser.select();
 
             // working in comments T_T
@@ -95,8 +95,15 @@ TypeNode::TypeNode(Parser &parser, Node *parent) : Node(parent, Type::Type) {
                     children.push_back(std::make_shared<CommentNode>(parser, this));
                 } else {
                     parser.jump(point);
-                    throw ParseError(parser,
-                        "Unknown action character {}, in type {}, with name {}.", action, name, next);
+
+                    if (!isPage)
+                        throw ParseError(parser, "Element with type {} can only be used on page components.", next);
+
+                    // expression nodes can be assumed to be UI view/scene nodes
+                    children.push_back(ExpressionNode::parse(parser, this));
+
+//                    throw ParseError(parser,
+//                        "Unknown action character {}, in type {}, with name {}.", action, name, next);
                 }
             }
         }

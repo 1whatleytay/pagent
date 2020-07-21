@@ -35,11 +35,10 @@ std::string JsContext::genReference(ReferenceNode *node, Node *scope) {
             }
         }
 
-        // this is probably not going to work
-//        if (e->init)
-//            params = fmt::format("().{}({})", reserveName(e), fmt::join(result, ", "));
-//        else
-        params = fmt::format("({})", fmt::join(result, ", "));
+        // length is called as a function but in js its a prop
+        if (e != arrayFunLength) {
+            params = fmt::format("({})", fmt::join(result, ", "));
+        }
     }
 
     if (node->hasContent)
@@ -55,13 +54,31 @@ std::string JsContext::genReference(ReferenceNode *node, Node *scope) {
             first = fmt::format("new {}().", reserveName(current->parent)); // . for $build later
     }
 
-//    first += node->content;
-    first += reserveName(current);
+    if (current == arrayFunLength) {
+        first = "length";
+    } else if (current == arrayFunEmpty) {
+        first = "empty"; // this is probably fine without
+    } else if (current == arrayFunAdd) {
+        first = "push";
+    } else if (current->type != Node::Type::Enum && current->type != Node::Type::Type) {
+        // dont copy enum, just have enumname/static -> prevents Align.Align$center
+        first += reserveName(current);
+    }
 
     std::string last;
 
-    if (node->next())
-        last = genReference(node->next(), node->findType(current));
+    if (node->next()) {
+        if (current->type != Node::Type::Enum && current->type != Node::Type::Type)
+            last += ".";
+
+        Node *typeNode = node->findType(current);
+
+        if (!typeNode) {
+            typeNode = array; // workaround for now
+        }
+
+        last += genReference(node->next(), typeNode);
+    }
 
     return first + params + last;
 }

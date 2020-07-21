@@ -17,17 +17,29 @@ std::string JsContext::genFunction(FunctionNode *node) {
 
     Node *body = node->body();
 
-    std::string content;
+    std::stringstream content;
 
     if (body->type == Node::Type::Expression) {
-        content = fmt::format("return {}", genExpression(body->as<ExpressionNode>()));
+        content << fmt::format("return {}", genExpression(body->as<ExpressionNode>()));
     } else if (body->type == Node::Type::Code) {
-        content = genCode(body->as<CodeNode>());
+        if (node->init) {
+            node->searchHere([this, &content](Node *node) {
+                if (node->type == Node::Type::Variable && node->as<VariableNode>()->init) {
+                    std::string name = reserveName(node);
+
+                    content << fmt::format("\nthis.{} = {}", name, name);
+                }
+
+                return false;
+            });
+        }
+
+        content << genCode(body->as<CodeNode>());
+
+        if (node->init)
+            content << "\nreturn this";
     }
 
-    if (node->init)
-        content += "\nreturn this";
-
     return fmt::format("\n{}{}({}) {{ {}\n}}",
-        node->isMethod() ? "" : "function ", reserveName(node), fmt::join(paramNames, ", "), indent(content));
+        node->isMethod() ? "" : "function ", reserveName(node), fmt::join(paramNames, ", "), indent(content.str()));
 }

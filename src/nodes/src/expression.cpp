@@ -7,6 +7,7 @@
 #include <nodes/number.h>
 #include <nodes/string.h>
 #include <nodes/lambda.h>
+#include <nodes/boolean.h>
 #include <nodes/operator.h>
 #include <nodes/reference.h>
 
@@ -83,6 +84,8 @@ Typename ExpressionNode::evaluate(std::vector<Node *> visited) {
             switch (children[0]->type) {
                 case Type::Number:
                     return Typename::number;
+                case Type::Boolean:
+                    return Typename::boolean;
                 case Type::String:
                     return Typename::string;
                 case Type::Lambda:
@@ -241,6 +244,8 @@ ExpressionNode::ExpressionNode(Parser &parser, Node *parent) : Node(parent, Type
         children.push_back(std::make_shared<IfNode>(parser, this));
     } else if (parser.peek() == "for") {
         children.push_back(std::make_shared<ForNode>(parser, this));
+    } else if (parser.peek() == "true" || parser.peek() == "false") {
+        children.push_back(std::make_shared<BooleanNode>(parser, this));
     } else {
         std::string peek = parser.peek();
 

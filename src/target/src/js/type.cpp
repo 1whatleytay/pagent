@@ -16,9 +16,9 @@ std::string JsContext::genType(TypeNode *node) {
         switch (child->type) {
             case Node::Type::Variable:
                 if (child->as<VariableNode>()->shared)
-                    global << "\n" << genVariable(child->as<VariableNode>());
+                    global << genVariable(child->as<VariableNode>());
                 else
-                    body << "\n" << genVariable(child->as<VariableNode>());
+                    body << genVariable(child->as<VariableNode>());
                 break;
 
             case Node::Type::Expression: // parsed as expression but is really UI, should be shown in template

@@ -1,4 +1,12 @@
 enum Align { left right center }
+enum ContentAlign { top bottom center }
+
+type Array {
+    fun add(value: Any) { }
+
+    fun length(): Number { }
+    fun empty(): Boolean { }
+}
 
 type Color {
     init var hex = '000000'
@@ -18,8 +26,80 @@ type Color {
     shared var white = Color('FFFFFF')
 }
 
-page view { }
-page scene { }
+type Padding {
+    var left = 0
+    var right = 0
+    var top = 0
+    var bottom = 0
+
+    init(all: Number) {
+        left = all
+        right = all
+        top = all
+        bottom = all
+    }
+
+    init(x: Number?, y: Number?) {
+        if has x {
+            left = x
+            right = x
+        }
+
+        if has y {
+            top = y
+            bottom = y
+        }
+    }
+
+    init(l: Number?, r: Number?, t: Number?, b: Number?) {
+        if has l { left = l }
+        if has r { right = r }
+        if has t { top = t }
+        if has b { bottom = b }
+    }
+}
+
+// not going to alias yet lol
+type Margin {
+    var left = 0
+    var right = 0
+    var top = 0
+    var bottom = 0
+
+    init(all: Number) {
+        left = all
+        right = all
+        top = all
+        bottom = all
+    }
+
+    init(x: Number?, y: Number?) {
+        if has x {
+            left = x
+            right = x
+        }
+
+        if has y {
+            top = y
+            bottom = y
+        }
+    }
+
+    init(l: Number?, r: Number?, t: Number?, b: Number?) {
+        if has l { left = l }
+        if has r { right = r }
+        if has t { top = t }
+        if has b { bottom = b }
+    }
+}
+
+type Border {
+    init var size: Number?
+    init var color: Color?
+}
+
+page View { }
+page Scene { }
 
 page Text {
     init var textSize: Number?
@@ -38,3 +118,21 @@ page Button {
 	init(text = '') { }
 	init(text: Number) { }
 }
+
+page Clickable { }
+
+page Link {
+    init var link: String
+}
+
+page Image {
+    init(link: String) { }
+}
+
+page Icon {
+    init var fillColor: Color?
+
+    init(link: String) { }
+}
+
+fun print(x: String) { }

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Pagent Error</title>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+
+        <style>
+            div {
+                font-family: 'Roboto', sans-serif;
+            }
+
+            .push {
+                margin-top: 12rem;
+            }
+
+            .title {
+                font-size: 24px;
+                text-align: center;
+                letter-spacing: 4px;
+                font-weight: bold;
+                margin: 4rem;
+            }
+
+            .major-problem {
+                font-size: 102px;
+                color: #ff0040;
+                text-align: center;
+                margin: 2rem;
+            }
+
+            .minor-problem {
+                font-size: 24px;
+                color: #555555;
+                text-align: center;
+            }
+        </style>
+    </head>
+    <body>
+        <div>
+            <div class="push">
+                <div class="title">
+                    PAGENT
+                </div>
+                <div class="major-problem">
+                    <!-- I dont really have a template engine sooo.... -->
+                    {{ MAJOR_PROBLEM }}
+                </div>
+                <div class="minor-problem">
+                    {{ MINOR_PROBLEM }}
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

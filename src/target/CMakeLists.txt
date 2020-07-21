@@ -8,6 +8,7 @@ add_library(target STATIC
     src/js/literal.cpp
     src/js/reference.cpp
     src/js/style.cpp
+    src/js/attributes.cpp
     src/js/ternary.cpp
     src/js/enum.cpp
     src/js/variable.cpp

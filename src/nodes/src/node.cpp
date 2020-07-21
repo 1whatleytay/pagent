@@ -14,6 +14,10 @@ const Typename Typename::number = Typename("Number");
 const Typename Typename::boolean = Typename("Boolean");
 
 bool Typename::operator==(const Typename &value) const {
+    if (name == any.name || value.name == any.name) {
+        return true;
+    }
+
     // do not compare optional! optional decoding is implicit so it would be tough to let this through
     return name == value.name
            && array == value.array

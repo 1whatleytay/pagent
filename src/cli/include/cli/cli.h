@@ -1,8 +1,11 @@
 #pragma once
 
-#include <nodes/context.h>
+#include <nodes/root.h>
+
+#include <cli/watcher.h>
 
 #include <memory>
+#include <thread>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -15,12 +18,18 @@ class Interpreter {
     std::unique_ptr<RootNode> root;
     std::string output;
 
+    std::unique_ptr<Watcher> watcher;
+    std::unique_ptr<std::thread> watcherThread;
+
     std::vector<std::string> arguments;
 
     std::string loadString(const std::string &path);
     std::vector<uint8_t> loadBinary(const std::string &path);
 
-    void compile(const std::string &path);
+    std::vector<uint8_t> errorMessage(const std::string &major, const std::string &details);
+
+    void compile(const std::string &source, bool silent = false);
+    void compilePath(const std::string &path, bool silent = false);
 
     void debug();
     void build();

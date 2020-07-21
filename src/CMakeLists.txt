@@ -12,3 +12,4 @@ configure_file(standard/standard.page ${CMAKE_CURRENT_BINARY_DIR}/standard.page 
 configure_file(standard/index.html ${CMAKE_CURRENT_BINARY_DIR}/index.html COPYONLY)
 configure_file(standard/framework.js ${CMAKE_CURRENT_BINARY_DIR}/framework.js COPYONLY)
 configure_file(standard/framework.css ${CMAKE_CURRENT_BINARY_DIR}/framework.css COPYONLY)
+configure_file(standard/error.html ${CMAKE_CURRENT_BINARY_DIR}/error.html COPYONLY)

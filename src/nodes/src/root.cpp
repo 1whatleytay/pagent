@@ -1,8 +1,9 @@
-#include <nodes/context.h>
+#include <nodes/root.h>
 
 #include <nodes/enum.h>
 #include <nodes/type.h>
 #include <nodes/string.h>
+#include <nodes/comment.h>
 #include <nodes/function.h>
 #include <nodes/variable.h>
 
@@ -14,7 +15,7 @@ namespace fs = std::filesystem;
 void RootNode::add(const RootNode &node) {
     for (const auto &child : node.children) {
         child->parent = this;
-        children.push_back(child);
+        children.insert(children.begin(), child); // introduce copying instead of destroying root node
     }
 }
 
@@ -40,6 +41,9 @@ RootNode::RootNode(Parser &parser, Node *parent, const std::string &path) : Node
         } else if (next == "import") {
             parser.next(); // import
 
+            if (path.empty())
+                throw ParseError(parser, "Import statements are not allowed without context.");
+
             StringNode location(parser, this);
 
             if (!location.indices.empty())
@@ -49,6 +53,9 @@ RootNode::RootNode(Parser &parser, Node *parent, const std::string &path) : Node
             std::string importPath = fs::path(path).remove_filename() / importText;
 
             std::ifstream stream(importPath, std::ios::ate);
+            if (!stream.good())
+                throw ParseError(parser, "Import statement imports \"{}\", but that file does not exist", importPath);
+
             std::vector<char> data(stream.tellg());
             stream.seekg(0, std::ios::beg);
             stream.read(data.data(), data.size());
@@ -56,7 +63,23 @@ RootNode::RootNode(Parser &parser, Node *parent, const std::string &path) : Node
             Parser importParser(std::string(data.begin(), data.end()));
             add(RootNode(importParser, nullptr, importPath));
         } else {
-            throw ParseError(parser, "Unknown keyword {}.", next);
+            size_t point = parser.select();
+
+            // working in comments T_T
+            if (parser.next() == "/" && parser.next() == "/") {
+                parser.jump(point);
+                children.push_back(std::make_shared<CommentNode>(parser, this));
+            } else {
+                parser.jump(point);
+
+                if (parser.next() == "/" && parser.next() == "*") {
+                    parser.jump(point);
+                    children.push_back(std::make_shared<CommentNode>(parser, this));
+                } else {
+                    parser.jump(point);
+                    throw ParseError(parser, "Unknown keyword {}.", next);
+                }
+            }
         }
     }
 }

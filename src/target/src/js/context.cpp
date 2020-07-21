@@ -19,8 +19,10 @@ std::string JsContext::reserveName(Node *node) {
     }
     assert(!base.empty());
 
-    auto existingName = names.find(node);
-    if (existingName != names.end())
+    auto &scopeNames = names[node->parent];
+
+    auto existingName = scopeNames.find(node);
+    if (existingName != scopeNames.end())
         return existingName->second;
 
 #ifdef DONT_BASE
@@ -31,7 +33,7 @@ std::string JsContext::reserveName(Node *node) {
 
     while (true) {
         bool fail = false;
-        for (const auto &pair : names) {
+        for (const auto &pair : scopeNames) {
             if (pair.second == tryName) {
                 fail = true;
                 break;
@@ -44,7 +46,7 @@ std::string JsContext::reserveName(Node *node) {
         tryName = fmt::format("{}${}", base, nextId());
     }
 
-    names[node] = tryName;
+    scopeNames[node] = tryName;
 
     return tryName;
 }
@@ -54,12 +56,12 @@ std::string JsContext::indent(const std::string &content) {
     if (content.empty())
         return "";
 
-    std::string result = "\t" + content;
+    std::string result = indentSpace + content;
 
     size_t start_pos = 0;
     while((start_pos = result.find("\n", start_pos)) != std::string::npos) {
-        result.replace(start_pos, 1, "\n\t");
-        start_pos += 2;
+        result.replace(start_pos, 1, "\n" + indentSpace);
+        start_pos += 3;
     }
 
     return result;
@@ -72,7 +74,19 @@ size_t JsContext::nextId() {
 std::string JsContext::build() {
     std::stringstream body;
 
-    std::vector<Node *> noBuild = { view, scene, text, button };
+    std::vector<Node *> noBuild = {
+        view,
+        scene,
+        text,
+        button,
+        icon,
+        image,
+        link,
+        clickable,
+        array,
+        align,
+        contentAlign
+    };
 
     for (const auto &child : root->children) {
         if (std::find(noBuild.begin(), noBuild.end(), child.get()) != noBuild.end())
@@ -122,10 +136,24 @@ std::string JsContext::build() {
 
     std::string routeMethod = routeStream.str();
     if (!routeMethod.empty()) {
-        body << "\nfunction $route($path) {" << indent(routeMethod) << "\n\treturn new $Component()\n}";
+        routeMethod += "\nreturn new $Component()";
+
+        body << "\nfunction $route($path) {" << indent(routeMethod) << "\n}";
     }
 
     return body.str();
+}
+
+NodeChecker findTypeWithName(std::string name) {
+    return [name](Node *node) {
+        return node->type == Node::Type::Type && node->as<TypeNode>()->name == name;
+    };
+}
+
+NodeChecker findFunctionWithName(std::string name) {
+    return [name](Node *node) {
+        return node->type == Node::Type::Function && node->as<FunctionNode>()->name == name;
+    };
 }
 
 NodeChecker findInitVarWithName(std::string name) {
@@ -139,20 +167,25 @@ NodeChecker findInitVarWithName(std::string name) {
     };
 }
 
+NodeChecker findEnumWithName(std::string name) {
+    return [name](Node *node) {
+        return node->type == Node::Type::Enum && node->as<EnumNode>()->name == name;
+    };
+}
+
 JsContext::JsContext(RootNode *root) : root(root) {
     // load standard
-    view = root->searchChildren([](Node *node) {
-        return node->type == Node::Type::Type && node->as<TypeNode>()->name == "view";
-    });
-    scene = root->searchChildren([](Node *node) {
-        return node->type == Node::Type::Type && node->as<TypeNode>()->name == "scene";
-    });
-    text = root->searchChildren([](Node *node) {
-        return node->type == Node::Type::Type && node->as<TypeNode>()->name == "Text";
-    });
-    button = root->searchChildren([](Node *node) {
-        return node->type == Node::Type::Type && node->as<TypeNode>()->name == "Button";
-    });
+    view = root->searchChildren(findTypeWithName("View"));
+    scene = root->searchChildren(findTypeWithName("Scene"));
+    text = root->searchChildren(findTypeWithName("Text"));
+    button = root->searchChildren(findTypeWithName("Button"));
+    image = root->searchChildren(findTypeWithName("Image"));
+    icon = root->searchChildren(findTypeWithName("Icon"));
+    clickable = root->searchChildren(findTypeWithName("Clickable"));
+    link = root->searchChildren(findTypeWithName("Link"));
+    array = root->searchChildren(findTypeWithName("Array"));
+    align = root->searchChildren(findEnumWithName("Align"));
+    contentAlign = root->searchChildren(findEnumWithName("ContentAlign"));
 
     textStyleTextSize = text->searchChildren(findInitVarWithName("textSize"));
     textStyleTextColor = text->searchChildren(findInitVarWithName("textColor"));
@@ -160,4 +193,11 @@ JsContext::JsContext(RootNode *root) : root(root) {
     buttonStyleTextSize = button->searchChildren(findInitVarWithName("textSize"));
     buttonStyleTextColor = button->searchChildren(findInitVarWithName("textColor"));
     buttonStyleTextAlign = button->searchChildren(findInitVarWithName("textAlign"));
+    iconStyleFillColor = icon->searchChildren(findInitVarWithName("fillColor"));
+    linkAttributeLink = link->searchChildren(findInitVarWithName("link"));
+    arrayFunAdd = array->searchChildren(findFunctionWithName("add"));
+    arrayFunEmpty = array->searchChildren(findFunctionWithName("empty"));
+    arrayFunLength = array->searchChildren(findFunctionWithName("length"));
+
+    print = root->searchChildren(findFunctionWithName("print"));
 }

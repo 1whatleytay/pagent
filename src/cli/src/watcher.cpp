@@ -2,28 +2,43 @@
 
 #include <sys/stat.h>
 
+#include <thread>
 #include <filesystem>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
 
 void Watcher::exec() {
-    if (fs::is_directory(path))
-        throw std::runtime_error("Watcher can only watch individual files.");
+    std::unordered_map<std::string, timespec> paths;
+
+    if (fs::is_directory(path)) {
+        for (auto &p : fs::recursive_directory_iterator(fs::path(path))) {
+            paths[p.path().string()] = timespec();
+        }
+    } else {
+        paths[path] = timespec();
+    }
 
     struct stat pathInfo;
-    stat(path.c_str(), &pathInfo);
 
-    timespec lastTime = pathInfo.st_mtimespec;
+    for (auto &pair : paths) {
+        stat(pair.first.c_str(), &pathInfo);
+        paths[pair.first] = pathInfo.st_mtimespec;
+    }
 
     while (!stop) {
-        stat(path.c_str(), &pathInfo);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-        if (lastTime.tv_nsec != pathInfo.st_mtimespec.tv_nsec
-            || lastTime.tv_sec != pathInfo.st_mtimespec.tv_sec) {
-            callback(path);
+        for (auto &pair : paths) {
+            stat(pair.first.c_str(), &pathInfo);
+
+            if (pair.second.tv_nsec != pathInfo.st_mtimespec.tv_nsec
+                || pair.second.tv_sec != pathInfo.st_mtimespec.tv_sec) {
+                callback(pair.first);
+            }
+
+            pair.second = pathInfo.st_mtimespec;
         }
-
-        lastTime = pathInfo.st_mtimespec;
     }
 }
 

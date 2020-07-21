@@ -10,12 +10,16 @@
 std::vector<Parameter> styleParameters = {
     { Typename("Color").asOptional(), "color" },
     { Typename("Align").asOptional(), "align" },
+    { Typename("ContentAlign").asOptional(), "contentAlign" },
     { Typename::number.asOptional(), "width" },
     { Typename::number.asOptional(), "height" },
     { Typename::number.asOptional(), "column" },
     { Typename::number.asOptional(), "row" },
-    { Typename::number.asOptional(), "padding" },
-    { Typename::number.asOptional(), "margin" },
+    { Typename("Padding").asOptional(), "padding" },
+    { Typename("Margin").asOptional(), "margin" },
+    { Typename::number.asOptional(), "rounded" },
+    { Typename::boolean.asOptional(), "stretch" }, // flex: 1 lol
+    { Typename("Border").asOptional(), "border" },
     { Typename(std::vector<Typename> { }).asOptional(), "click" },
     { Typename(std::vector<Typename> { }).asOptional(), "mouseEnter" },
     { Typename(std::vector<Typename> { }).asOptional(), "mouseExit" },
@@ -89,15 +93,16 @@ MapResult Parameters::map(std::vector<Node *> values, std::map<std::string, size
 
     for (size_t a = 0; a < usedParameter.size(); a++) {
         if (!usedParameter[a]) {
-            if (!operator[](a).type.optional)
-                return MapResult(fmt::format("Missing value for non-optional parameter {}.", operator[](a).name));
+            bool optional = operator[](a).type.optional;
 
             // builtins better be optional
             if (operator[](a).reference) {
                 VariableNode *var = operator[](a).reference->as<VariableNode>();
 
-                if (var->children.empty())
+                if (var->children.empty() && !optional)
                     return MapResult(fmt::format("Missing value for non-optional parameter {}.", operator[](a).name));
+            } else if (!optional) {
+                return MapResult(fmt::format("Missing value for non-optional parameter {}.", operator[](a).name));
             }
         }
     }

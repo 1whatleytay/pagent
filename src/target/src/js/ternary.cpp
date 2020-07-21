@@ -7,7 +7,11 @@ std::string JsContext::genTernary(IfNode *node, size_t index) {
     std::string other;
 
     if ((index + 3) >= node->children.size()) { // is this branch with terminating else?
-        other = genExpression(node->children[index + 2]->as<ExpressionNode>());
+        if ((index + 2) >= node->children.size()) {
+            other = "null";
+        } else {
+            other = genExpression(node->children[index + 2]->as<ExpressionNode>());
+        }
     } else {
         other = genTernary(node, index + 2);
     }

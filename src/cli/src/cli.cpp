@@ -14,6 +14,7 @@
 
 #include <thread>
 #include <fstream>
+#include <iostream>
 
 const std::string Interpreter::usage = "Usage: page <server/build/debug> path/to/source.page";
 
@@ -45,41 +46,97 @@ std::vector<uint8_t> Interpreter::loadBinary(const std::string &path) {
     return data;
 }
 
-void Interpreter::compile(const std::string &path) {
+std::string replace(std::string text, std::string find, std::string replace) {
+    // i cant be bothered to https://stackoverflow.com/a/3418285
+    if (text.empty())
+        return "";
+
+    size_t start_pos = 0;
+    while((start_pos = text.find(find, start_pos)) != std::string::npos) {
+        text.replace(start_pos, find.size(), replace);
+        start_pos += replace.size();
+    }
+
+    return text;
+}
+
+std::vector<uint8_t> Interpreter::errorMessage(const std::string &major, const std::string &details) {
+    std::string templateHTML = loadString(parent / "error.html");
+    std::string result = replace(replace(templateHTML, "{{ MAJOR_PROBLEM }}", major), "{{ MINOR_PROBLEM }}", details);
+
+    return std::vector<uint8_t>(result.begin(), result.end());
+}
+
+void Interpreter::compile(const std::string &source, bool silent) {
     std::string standardPath = parent / "standard.page";
 
-    fmt::print("Building standard....\n");
+    if (!silent)
+        fmt::print("Building standard....\n");
     Parser standardParser(loadString(standardPath));
     RootNode standard(standardParser, nullptr, standardPath);
 
-    fmt::print("Building root...\n");
-    Parser rootParser(loadString(path));
-    root = std::make_unique<RootNode>(rootParser, nullptr, path);
+    if (!silent)
+        fmt::print("Building root...\n");
+    Parser rootParser(source);
+    root = std::make_unique<RootNode>(rootParser, nullptr, "");
     root->add(standard);
     root->verify();
 
-    fmt::print("Generating output...\n");
+    if (!silent)
+        fmt::print("Generating output...\n");
     output = JsContext(root.get()).build();
 
-    fmt::print("OK\n");
+    if (!silent)
+        fmt::print("OK\n");
+}
+
+void Interpreter::compilePath(const std::string &path, bool silent) {
+    compile(loadString(path), silent);
 }
 
 void Interpreter::debug() {
     if (arguments.size() < 2)
         throw std::runtime_error(usage);
 
-    compile(arguments[1]);
+    if (arguments[1] == "stdin") {
+        size_t length = 0;
+        std::cin >> length;
 
-    fmt::print("{}\n\n{}\n", NodeList(root.get()).toString(), output);
+        std::vector<char> data(length);
+        std::cin.read(data.data(), data.size());
+
+        compile(std::string(data.begin(), data.end()), true);
+
+        fmt::print("{}\n", output);
+    } else {
+        if (arguments.size() < 3)
+            throw std::runtime_error(usage);
+
+        compilePath(arguments[2], true);
+
+        if (arguments[1] == "nodes") {
+            fmt::print("{}\n", NodeList(root.get()).toString());
+        }
+
+        if (arguments[1] == "js") {
+            fmt::print("{}\n", output);
+        }
+    }
 }
 
 void Interpreter::build() {
     if (arguments.size() < 2)
         throw std::runtime_error(usage);
 
-    compile(arguments[1]);
+    compilePath(arguments[1]);
 
-    assert(false); // not going to bother lol
+    std::string destination = "app.js";
+
+    if (arguments.size() > 2)
+        destination = arguments[2];
+
+    std::ofstream stream(destination, std::ios::trunc);
+    stream.write(output.c_str(), output.size());
 }
 
 void Interpreter::serve() {
@@ -87,31 +144,49 @@ void Interpreter::serve() {
         throw std::runtime_error(usage);
 
     std::string sourcePath = arguments[1];
+    std::string watchPath = sourcePath;
 
-    compile(sourcePath);
+    if (arguments.size() >= 3)
+        watchPath = arguments[2];
 
-    volatile bool needsRecompile = false;
+    volatile bool needsRecompile = true;
 
-    Watcher watcher(sourcePath, [&needsRecompile](std::string path) {
+    watcher = std::make_unique<Watcher>(watchPath, [&needsRecompile](std::string path) {
         needsRecompile = true;
     });
 
-    std::thread watcherThread([&watcher]() { watcher.exec(); });
+    watcherThread = std::make_unique<std::thread>([this]() { watcher->exec(); });
 
     sockets::ServerSocket server(80);
 
-    fmt::print("Serving on http://localhost:80\n");
+    fmt::print("Serving on http://localhost:{}\n", server.getPort());
 
-    std::vector<uint8_t> outputData(output.begin(), output.end());
+    std::vector<uint8_t> outputData;
     std::vector<uint8_t> css = loadBinary(parent / "framework.css");
     std::vector<uint8_t> framework = loadBinary(parent / "framework.js");
     std::vector<uint8_t> index = loadBinary(parent / "index.html");
+    std::vector<uint8_t> error;
 
     while (!stop) {
         if (needsRecompile) {
-            compile(sourcePath);
+            try {
+                compilePath(sourcePath);
 
-            outputData = std::vector<uint8_t>(output.begin(), output.end());
+                outputData = std::vector<uint8_t>(output.begin(), output.end());
+                error.clear();
+            } catch (const ParseError &e) { // haha
+                fmt::print("{}\n", e.what());
+                error = errorMessage("ParseError", e.what());
+            } catch (const VerifyError &e) {
+                fmt::print("{}\n", e.what());
+                error = errorMessage("VerifyError", e.what());
+            } catch (const CompileError &e) {
+                fmt::print("{}\n", e.what());
+                error = errorMessage("CompileError", e.what());
+            } catch (const std::runtime_error &e) {
+                fmt::print("{}\n", e.what());
+                error = errorMessage("GenericError", e.what());
+            }
 
             needsRecompile = false;
         }
@@ -136,13 +211,10 @@ void Interpreter::serve() {
             } else if (request.path == "/framework.css") {
                 http::Response().content(css).send(write);
             } else {
-                http::Response().content(index).send(write);
+                http::Response().content(error.empty() ? index : error).send(write);
             }
         }
     }
-
-    watcher.stop = true;
-    watcherThread.join();
 }
 
 void Interpreter::exec() {
@@ -159,13 +231,18 @@ void Interpreter::exec() {
         if (arguments[0] == "serve")
             serve();
     } catch (const ParseError &e) { // haha
-        fmt::print("{}\n", e.what());
+        fmt::print("ParseError: {}\n", e.what());
     } catch (const VerifyError &e) {
-        fmt::print("{}\n", e.what());
+        fmt::print("VerifyError: {}\n", e.what());
     } catch (const CompileError &e) {
-        fmt::print("{}\n", e.what());
+        fmt::print("CompileError: {}\n", e.what());
     } catch (const std::runtime_error &e) {
         fmt::print("{}\n", e.what());
+    }
+
+    if (watcher) {
+        watcher->stop = true;
+        watcherThread->join();
     }
 }
 

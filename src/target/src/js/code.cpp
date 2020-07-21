@@ -10,33 +10,47 @@ std::string JsContext::genCode(CodeNode *node) {
     std::stringstream stream;
 
     for (const auto &child : node->children) {
-        if (child->type == Node::Type::Expression) {
-            std::string expression = genExpression(child->as<ExpressionNode>());
-            // lazy, will just trim out ( ) from expression, sure to cause issues in the future
-            stream << "\n" << (expression.empty() ? "" : expression.substr(1, expression.size() - 2));
-        } else if (child->type == Node::Type::Statement) {
-            StatementNode *e = child->as<StatementNode>();
-
-            switch (e->op) {
-                case StatementNode::Operator::Break:
-                    stream << "\nbreak";
-                    break;
-                case StatementNode::Operator::Continue:
-                    stream << "\ncontinue";
-                    break;
-                case StatementNode::Operator::Return:
-                    if (e->children.empty()) {
-                        stream << "\nreturn";
-                    } else {
-                        stream << fmt::format("\nreturn {}{}",
-                                              genExpression(e->children[0]->as<ExpressionNode>()));
-                    }
-                    break;
-                default:
-                    assert(false);
+        switch (child->type) {
+            case Node::Type::Expression: {
+                std::string expression = genExpression(child->as<ExpressionNode>());
+                // lazy, will just trim out ( ) from expression, sure to cause issues in the future
+                if (!expression.empty() && child->as<ExpressionNode>()->op != ExpressionNode::Operator::Literal)
+                    expression = expression.substr(1, expression.size() - 2);
+                stream << "\n" << expression;
+                break;
             }
-        } else {
-            assert(false);
+            case Node::Type::Statement: {
+                StatementNode *e = child->as<StatementNode>();
+
+                switch (e->op) {
+                    case StatementNode::Operator::Break:
+                        stream << "\nbreak";
+                        break;
+                    case StatementNode::Operator::Continue:
+                        stream << "\ncontinue";
+                        break;
+                    case StatementNode::Operator::Return:
+                        if (e->children.empty()) {
+                            stream << "\nreturn";
+                        } else {
+                            stream << fmt::format("\nreturn {}{}",
+                                                  genExpression(e->children[0]->as<ExpressionNode>()));
+                        }
+                        break;
+                    default:
+                        assert(false);
+                }
+                break;
+            }
+            case Node::Type::Variable: {
+                VariableNode *e = child->as<VariableNode>();
+
+                stream << "\n" << genVariable(e);
+
+                break;
+            }
+            default:
+                throw CompileError(child.get(), "Unexpected node type in CodeNode.");
         }
     }
 

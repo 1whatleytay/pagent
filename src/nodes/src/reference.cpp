@@ -39,6 +39,10 @@ Node *ReferenceNode::findType(Node *referenced) {
             extendType = referenced->as<VariableNode>()->evaluate();
     }
 
+    if (extendType.array) {
+        return nullptr; // TODO: yikesss
+    }
+
     TypeNode *evalNode = referenced->searchScope([&extendType](Node *node) {
         return node->type == Type::Type && Typename(node->as<TypeNode>()->name) == extendType;
     })->as<TypeNode>();
@@ -54,6 +58,9 @@ std::vector<Node *> ReferenceNode::dereference(Node *reference) {
 
     if (next()) {
         Node *evalNode = findType(selectFrom(result));
+
+        if (!evalNode)
+            return result; // TODO: yikesssss
 
         return next()->dereference(evalNode);
     }
@@ -81,7 +88,7 @@ std::vector<Node *> ReferenceNode::dereferenceThis(Node *reference) {
         throw VerifyError("Reference {} does not reference anything.", content);
 
     // constructor calling
-    if (result[0]->type == Type::Type) {
+    if (result[0]->type == Type::Type && (hasCall || hasContent)) {
         if (result.size() != 1)
             throw VerifyError("Internal reference error, multiple constructor types.");
 

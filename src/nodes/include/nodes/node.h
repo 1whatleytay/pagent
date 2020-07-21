@@ -46,6 +46,7 @@ public:
         Root,
         Code,
         Enum,
+        Boolean,
         Enumname,
         Type,
         Variable,

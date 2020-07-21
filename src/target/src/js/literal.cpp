@@ -8,6 +8,7 @@
 #include <nodes/lambda.h>
 #include <nodes/number.h>
 #include <nodes/string.h>
+#include <nodes/boolean.h>
 #include <nodes/function.h>
 #include <nodes/reference.h>
 #include <nodes/expression.h>
@@ -16,14 +17,19 @@ std::string JsContext::genLiteral(Node *node) {
     switch (node->type) {
         case Node::Type::Number:
             return fmt::format("{}", node->as<NumberNode>()->value);
+        case Node::Type::Boolean:
+            return node->as<BooleanNode>()->value ? "true" : "false";
         case Node::Type::String: {
             StringNode *e = node->as<StringNode>();
 
             std::string output = e->text;
 
+            size_t correction = 0;
             for (size_t a = 0; a < e->indices.size(); a++) {
-                output.insert(e->indices[a],
-                    fmt::format("${{ {} }}", genExpression(e->children[a]->as<ExpressionNode>())));
+                std::string insert = fmt::format("${{ {} }}", genExpression(e->children[a]->as<ExpressionNode>()));
+
+                output.insert(e->indices[a] + correction, insert);
+                correction += insert.size();
             }
 
             return fmt::format("`{}`", output);
@@ -44,13 +50,62 @@ std::string JsContext::genLiteral(Node *node) {
             Node *selected = e->select();
 
             // standard initializers, view, scene, type, node
-            if (selected->type == Node::Type::Function && selected->as<FunctionNode>()->init) {
-                if (selected->parent == view || selected->parent == scene) {
-                    bool isScene = selected->parent == scene;
+            if (selected->type == Node::Type::Function) {
+                if (selected->as<FunctionNode>()->init) {
+                    if (selected->parent == view || selected->parent == scene
+                        || selected->parent == clickable || selected->parent == link) {
+                        bool isScene = selected->parent == scene;
 
-                    std::string style;
+                        bool isRootView = e->parent->parent->type == Node::Type::Type;
 
-                    if (e->hasCall) {
+                        std::string style;
+                        std::string attributes;
+
+                        if (e->hasCall) {
+                            std::vector<Node *> passed = e->getParameters();
+                            Parameters parameters = selected->as<FunctionNode>()->parameters();
+
+                            MapResult map = parameters.map(passed, e->names);
+
+                            if (!map.matches)
+                                throw CompileError(selected, "Could not match constructor to text.");
+
+                            style = genStyle(parameters, map.map, passed);
+                            attributes = genAttributes(parameters, map.map, passed);
+                        }
+
+                        std::stringstream content;
+
+                        if (e->hasContent) {
+                            CodeNode *nodeContent = e->getContent()->as<CodeNode>();
+
+                            for (const auto &child : nodeContent->children) {
+                                if (child->type == Node::Type::Comment)
+                                    continue;
+
+                                if (child->type != Node::Type::Expression)
+                                    throw CompileError(child.get(),
+                                        "Cannot have non expression in content for view/scene.");
+
+                                content << fmt::format("\n${{ $insert({}) }}", genExpression(child->as<ExpressionNode>()));
+                            }
+                        }
+
+                        std::string tag = "div";
+
+                        if (selected->parent == clickable) {
+                            tag = "button";
+                        }
+
+                        if (selected->parent == link) {
+                            tag = "a";
+                        }
+
+                        return fmt::format("`<{}{} style=\"display: {};{}\"{}>{}\n</{}>`",
+                            tag, isRootView ? " id=\"${this.$uuid}\"" : "",
+                            isScene ? "flex" : "block", style, attributes, indent(content.str()), tag);
+                    } else if (selected->parent == text || selected->parent == button
+                        || selected->parent == image || selected->parent == icon) {
                         std::vector<Node *> passed = e->getParameters();
                         Parameters parameters = selected->as<FunctionNode>()->parameters();
 
@@ -59,62 +114,49 @@ std::string JsContext::genLiteral(Node *node) {
                         if (!map.matches)
                             throw CompileError(selected, "Could not match constructor to text.");
 
-                        style = genStyle(parameters, map.map, passed);
-                    }
-
-                    std::stringstream content;
-
-                    if (e->hasContent) {
-                        CodeNode *nodeContent = e->getContent()->as<CodeNode>();
-
-                        for (const auto &child : nodeContent->children) {
-                            if (child->type != Node::Type::Expression)
-                                throw CompileError(child.get(),
-                                                   "Cannot have non expression in content for view/scene.");
-
-                            content << fmt::format("\n${{ $insert({}) }}", genExpression(child->as<ExpressionNode>()));
-                        }
-                    }
-
-                    return fmt::format("`<div style=\"display: {};{}\">{}\n</div>`",
-                                       isScene ? "flex" : "block", style, indent(content.str()));
-                } else if (selected->parent == text || selected->parent == button) {
-                    std::vector<Node *> passed = e->getParameters();
-                    Parameters parameters = selected->as<FunctionNode>()->parameters();
-
-                    MapResult map = parameters.map(passed, e->names);
-
-                    if (!map.matches)
-                        throw CompileError(selected, "Could not match constructor to text.");
-
-                    std::string style = genStyle(parameters, map.map, passed);
-                    std::string styleTemplate;
-                    if (!style.empty()) {
-                        styleTemplate = fmt::format(" style=\"{}\"", style);
-                    }
-
-                    std::vector<std::string> result(parameters.size());
-
-                    for (size_t a = 0; a < map.map.size(); a++) {
-                        result[map.map[a]] = genExpression(passed[a]->as<ExpressionNode>());
-                    }
-
-                    if (selected->parent == text) {
-                        return fmt::format("`<div{}>${{ $clean({}) }}</div>`", styleTemplate, result[0]);
-                    } else if (selected->parent == button) {
-                        std::string onclickFormat;
-                        if (!result[1].empty()) {
-                            onclickFormat = fmt::format(
-                                " onclick=\"$callEvent(${{ $routeEvent(() => {{ return ({})() }}) }})\"",
-                                result[1]);
+                        std::string style = genStyle(parameters, map.map, passed);
+                        std::string styleTemplate;
+                        if (!style.empty()) {
+                            styleTemplate = fmt::format(" style=\"{}\"", style);
                         }
 
-                        return fmt::format("`<button{}{}>${{ $clean({}) }}</button>`",
-                            styleTemplate, onclickFormat, result[0]);
+                        std::string attributes = genAttributes(parameters, map.map, passed);
+
+                        std::vector<std::string> result(parameters.size());
+
+                        for (size_t a = 0; a < map.map.size(); a++) {
+                            result[map.map[a]] = genExpression(passed[a]->as<ExpressionNode>());
+                        }
+
+                        if (selected->parent == text) {
+                            return fmt::format("`<div{}{}>${{ $clean({}) }}</div>`",
+                                styleTemplate, attributes, result[0]);
+                        } else if (selected->parent == button) {
+                            return fmt::format("`<button{}{}>${{ $clean({}) }}</button>`",
+                                styleTemplate, attributes, result[0]);
+                        } else if (selected->parent == image) {
+                            return fmt::format("`<img{}{} src=\"${{ {} }}\" alt=\"Image\">`",
+                                styleTemplate, attributes, result[0]);
+                        } else if (selected->parent == icon) {
+                            return fmt::format("`<svg><use xlink:href=\"${{ {} }}{}{}\"></use></svg>`",
+                                result[0], styleTemplate, attributes);
+                        }
                     }
                 } else {
-                    // just pass to genReference
-//                    throw CompileError(selected, "Internal custom render type error.");
+                    if (selected == print) {
+                        std::vector<Node *> passed = e->getParameters();
+                        Parameters parameters = selected->as<FunctionNode>()->parameters();
+
+                        MapResult map = parameters.map(passed, e->names);
+
+                        std::vector<std::string> result(parameters.size());
+
+                        for (size_t a = 0; a < map.map.size(); a++) {
+                            result[map.map[a]] = genExpression(passed[a]->as<ExpressionNode>());
+                        }
+
+                        return fmt::format("console.log({})", result[0]);
+                    }
                 }
             }
 
@@ -126,7 +168,32 @@ std::string JsContext::genLiteral(Node *node) {
             if (e->hasValue()) {
                 return genTernary(e);
             } else {
-                assert(false);
+                std::stringstream stream;
+
+                bool first = true;
+                size_t index = 0;
+                while (index < e->children.size()) {
+                    if (index + 1 < e->children.size()) {
+                        if (!first) {
+                            stream << " else ";
+                        } else {
+                            first = false;
+                        }
+
+                        stream << "if ";
+
+                        stream << "(" << genExpression(e->children[index]->as<ExpressionNode>()) << ") ";
+
+                        index++;
+                    } else {
+                        stream << " else ";
+                    }
+
+                    stream << "{" << indent(genCode(e->children[index]->as<CodeNode>())) << "\n}";
+                    index++;
+                }
+
+                return stream.str();
             }
         }
         case Node::Type::For: {
@@ -138,7 +205,7 @@ std::string JsContext::genLiteral(Node *node) {
             if (!e->hasValue())
                 throw CompileError(e, "Unsupported no value for loop.");
 
-            return fmt::format("{}.map(({}) => {}){}",
+            return fmt::format("{}.map(({}) => {})",
                 genExpression(e->children[1]->as<ExpressionNode>()),
                 e->children[0]->as<VariableNode>()->name,
                 genExpression(e->children[2]->as<ExpressionNode>()));

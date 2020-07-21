@@ -1,7 +1,20 @@
 body {
     margin: 0;
+    font-family: 'Nunito', sans-serif;
 }
 
-div {
-    font-family: 'Roboto', sans-serif;
+button {
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Nunito', sans-serif;
+
+    /* make it more like div */
+    padding: 0;
+    width: 100%;
+}
+
+a {
+    color: black;
+    text-underline: none;
 }
