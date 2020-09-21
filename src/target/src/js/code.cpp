@@ -33,8 +33,8 @@ std::string JsContext::genCode(CodeNode *node) {
                         if (e->children.empty()) {
                             stream << "\nreturn";
                         } else {
-                            stream << fmt::format("\nreturn {}{}",
-                                                  genExpression(e->children[0]->as<ExpressionNode>()));
+                            stream << fmt::format("\nreturn {}",
+                                genExpression(e->children[0]->as<ExpressionNode>()));
                         }
                         break;
                     default:

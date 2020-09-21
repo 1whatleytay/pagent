@@ -1,5 +1,7 @@
 #include <nodes/attributes.h>
 
+#include <algorithm>
+
 std::unordered_map<std::string, bool> parseAttributes(Parser &parser, const std::vector<std::string> &names) {
     std::unordered_map<std::string, bool> result;
 
